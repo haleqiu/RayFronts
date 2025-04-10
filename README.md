@@ -22,7 +22,7 @@
   <a href="https://theairlab.org/team/sebastian/"><strong>Sebastian Scherer</strong></a>
 </p>
 
-  <h3 align="center"><a href="">Paper</a> | <a href="https://RayFronts.github.io/">Project Page</a></h3>
+  <h3 align="center"><a href="https://arxiv.org/abs/2504.06994">Paper</a> | <a href="https://RayFronts.github.io/">Project Page</a></h3>
   <div align="center"></div>
 
 ## News/Release
