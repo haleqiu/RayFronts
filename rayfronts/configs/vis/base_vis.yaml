@@ -1,0 +1,19 @@
+# How often to update the visualization of the map.
+# Set to -1 to disable map visualization.
+map_period: 10
+
+# How often to visualize 2D inputs (RGB/depth/feature images).
+# Set to -1 to disable visualizing pose.
+input_period: 5
+
+# How often to log pose. Set to -1 to disable visualizing pose and trajectory.
+pose_period: 5
+
+# Whether to use the same heatmap scale across all logs.
+global_heat_scale: False
+
+# If you already have a precomputed PCA basis .pt file as CxD torch tensor,
+# where C represents the original feature dim and D is > 3 is the compressed
+# dim, then you can pass the path here to avoid recomputing. This will be used
+# to map C dimensional feature vectors into RGB for visualization.
+feat_proj_basis_path: ${feat_proj_basis_path}
