@@ -215,6 +215,20 @@ class NARadioEncoder(LangSpatialGlobalImageEncoder):
       chosen_cls_id=self.lang_adaptor.head_idx,
       device=self.device,
       num_prefix_tokens=self.model.num_summary_tokens)
+    
+  @property
+  def input_resolution(self):
+    return self.model.model.blocks[-1].attn.input_resolution
+  
+  @input_resolution.setter
+  def input_resolution(self, value):
+    if hasattr(value, "__len__") and len(value) == 2:
+      if self.is_compatible_size(*value):
+        self.model.model.blocks[-1].attn.input_resolution=value
+      else:
+        raise ValueError(f"Incompatible input resolution {value}")
+    else:
+      raise ValueError("Input resolution must be a tuple of two ints")
 
   @override
   def encode_labels(self, labels: List[str]) -> torch.FloatTensor:
@@ -294,7 +308,7 @@ class NARadioEncoder(LangSpatialGlobalImageEncoder):
     if not self.return_radio_features:
       return features
     B,C,H,W = features.shape
-    features = features.reshape(B, -1, C)
+    features = features.permute(0, 2, 3, 1).reshape(B, -1, C)
     out = self.lang_adaptor.head_mlp(features)
     return out.permute(0, 2, 1).reshape(B, -1, H, W)
 

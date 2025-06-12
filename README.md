@@ -50,6 +50,9 @@
       <a href="#running-rayfronts">Running RayFronts</a>
     </li>
     <li>
+      <a href="#running-image-encoding">Running Image Encoding</a>
+    </li>
+    <li>
       <a href="#benchmarking">Benchmarking</a>
     </li>
     <li>
@@ -113,6 +116,14 @@ To run the docker image, an example command is available at the top of each dock
     python3 -m rayfronts.mapping_server dataset=niceslam_replica dataset.path="path_to_niceslam_replica" mapping=semantic_ray_frontiers_map mapping.vox_size=0.05 dataset.rgb_resolution=[640, 480] dataset.depth_resolution=[640, 480]
     ```
 4. To add and visualize queries, setup a query file (named "prompts.txt" for e.g) and add a query at each line in the text file (You can add paths to images for image querying). Next, add the following command line options when running RayFronts `querying.text_query_mode=prompts querying.query_file=prompts.txt querying.compute_prob=True querying.period=100`. More information can be found about the querying options in the [default.yml](rayfronts/configs/default.yml) config file.
+
+## Running Image Encoding
+If you are interested in using the encoder on its own for zero-shot open-vocabulary semantic segmentation, follow the example at the top of the [NARADIO](rayfronts/image_encoders/naradio.py) module.
+Or run the provided GRADIO app using:
+
+```
+python scripts/encoder_semseg_app.py encoder=naradio encoder.model_version=radio_v2.5-b
+```
 
 ## Benchmarking
 

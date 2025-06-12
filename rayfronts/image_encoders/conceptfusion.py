@@ -36,11 +36,7 @@ class ConceptFusionEncoder(LangSpatialGlobalImageEncoder):
                sam_model = "vit_h",
                sam_model_path = "sam_vit_h_4b8939.pth",
                open_clip_model = "ViT-H-14",
-               open_clip_pretrained_dataset = "laion2b_s32b_b79k",
-               out_height = 224,
-               out_width = 224):
-
-
+               open_clip_pretrained_dataset = "laion2b_s32b_b79k"):
     super().__init__(device)
     self.sam = sam_model_registry[sam_model](checkpoint=sam_model_path)
     self.sam.to(device=device)
@@ -60,10 +56,6 @@ class ConceptFusionEncoder(LangSpatialGlobalImageEncoder):
     self.model.eval()
 
     self.tokenizer = open_clip.get_tokenizer(open_clip_model)
-
-    self.out_height = out_height
-    self.out_width = out_width
-
 
   @override
   def encode_labels(self, labels: List[str]) -> torch.FloatTensor:
@@ -175,9 +167,9 @@ class ConceptFusionEncoder(LangSpatialGlobalImageEncoder):
 
   @override
   def is_compatible_size(self, h: int, w: int):
-    return h == self.out_height and w == self.out_width
+    return True
 
   @override
   def get_nearest_size(self, h, w):
-    return (self.out_height, self.out_width)
+    return h,w
 
