@@ -33,7 +33,9 @@
 - 🚀 Bootstrap your semantic mapping project. Utilize the modular RayFronts mapping codebase with its supported datasets to build your project (Novel encoding, novel mapping, novel feature fusion...etc.) and get results fast.
 - 💬 Reach out or raise an issue if you face any problems !
 ## News/Release
-- [06.11.2025] 🔥🔥 RayFronts code is released !
+- [06.16.2025] 🔥🔥🔥 RayFronts has been accepted to [IROS25](https://www.iros25.org/). See you in Hangzhou !!
+- [06.12.2025] 🔥🔥 RayFronts has been accepted to [RSS25](https://roboticsconference.org/) [SemRobs](https://semrob.github.io/) & [RoboReps](https://rss25-roboreps.github.io/) Workshops. See you in Los Angeles !!
+- [06.11.2025] 🔥 RayFronts code is released !
 - [8.4.2025] Initial public arxiv release.
 ---
 
