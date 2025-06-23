@@ -87,7 +87,7 @@ For a full local installation:
     
     openvdb/build && cd openvdb/build
 
-    cmake -DCMAKE_INSTALL_PREFIX=/usr/local \
+    cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX \
     -DOPENVDB_BUILD_NANOVDB=ON \
     -DOPENVDB_BUILD_PYTHON_MODULE=ON \
     -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
