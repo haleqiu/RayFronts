@@ -26,7 +26,8 @@ import torch
 import openvdb
 
 from rayfronts.mapping.base import SemanticRGBDMapping
-from rayfronts import geometry3d as g3d, visualizers, image_encoders
+from rayfronts import (geometry3d as g3d, visualizers, image_encoders,
+                       feat_compressors)
 from rayfronts.utils import compute_cos_sim
 
 sys.path.insert(
@@ -45,8 +46,7 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
     visualizer: See base.
     clip_bbox: See base
     encoder: See base.
-    stored_feat_dim: See base.
-    basis: See base.
+    feat_compressor: See base.
     interp_mode: See base.
 
     max_pts_per_frame: See __init__.
@@ -99,8 +99,7 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
                visualizer: visualizers.Mapping3DVisualizer = None,
                clip_bbox: Tuple[Tuple] = None,
                encoder: image_encoders.ImageEncoder = None,
-               stored_feat_dim: int = -1,
-               feat_proj_basis_path: str = None,
+               feat_compressor: feat_compressors.FeatCompressor = None,
                interp_mode: str = "bilinear",
 
                max_pts_per_frame: int = -1,
@@ -140,8 +139,7 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
       visualizer: See base.
       clip_bbox: See base.
       encoder: See base.
-      stored_feat_dim: See base.
-      feat_proj_basis_path: See base.
+      feat_compressor: See base.
       interp_mode: See base.
 
       max_pts_per_frame: How many points to project per frame. Set to -1 to 
@@ -209,7 +207,7 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
       infer_direction: Whether to infer frontier directions based on occupancy.
     """
     super().__init__(intrinsics_3x3, device, visualizer, clip_bbox, encoder,
-                     stored_feat_dim, feat_proj_basis_path, interp_mode)
+                     feat_compressor, interp_mode)
 
     self.max_pts_per_frame = max_pts_per_frame
     self.max_dirs_per_frame = max_rays_per_frame
@@ -823,7 +821,8 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
   @override
   def feature_query(self,
                     feat_query: torch.FloatTensor,
-                    softmax: bool = False)-> dict:
+                    softmax: bool = False,
+                    compressed: bool = True)-> dict:
     if self.is_empty():
       return
 
@@ -831,6 +830,8 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
     # Query semantic voxels
     if self.global_vox_xyz is not None:
       vox_feat = self.global_vox_feat
+      if self.feat_compressor is not None and not compressed:
+        vox_feat = self.feat_compressor.decompress(vox_feat)
       vox_feat = self.encoder.align_spatial_features_with_language(
         vox_feat.unsqueeze(-1).unsqueeze(-1)
       ).squeeze(-1).squeeze(-1)
@@ -842,7 +843,8 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
        self.global_rays_orig_angles.shape[0] > 0:
 
       rays_feat = self.global_rays_feat
-
+      if self.feat_compressor is not None and not compressed:
+        rays_feat = self.feat_compressor.decompress(rays_feat)
       rays_feat = self.encoder.align_spatial_features_with_language(
         rays_feat.unsqueeze(-1).unsqueeze(-1)
       ).squeeze(-1).squeeze(-1)
@@ -862,7 +864,7 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
                             layer="voxel_rgb")
       if self.encoder is not None:
         self.visualizer.log_feature_pc(
-          self.global_vox_xyz, self.global_vox_feat, layer="voxel_feature_pca")
+          self.global_vox_xyz, self.global_vox_feat, layer="voxel_feature")
 
       log_hit_count = torch.log2(self.global_vox_cnt.squeeze())
       self.visualizer.log_heat_pc(self.global_vox_xyz, log_hit_count,

@@ -353,9 +353,12 @@ class SrchVolEval(SemSegEval):
     if (mapper.global_rays_orig_angles is not None and
         mapper.global_rays_orig_angles.shape[0] > 0):
       feats = mapper.global_rays_feat
+      if (self.feat_compressor is not None and 
+          not self.cfg.querying.compressed):
+        feats = self.feat_compressor.decompress(feats)
       feats = self.encoder.align_spatial_features_with_language(
-        feats.unsqueeze(-1).unsqueeze(-1)
-      ).squeeze(-1).squeeze(-1)
+        feats.unsqueeze(-1).unsqueeze(-1)).squeeze(-1).squeeze(-1)
+      
       ray_preds = eval_utils.compute_semseg_preds(
         feats, feat_queries, self.cfg.prompt_denoising_thresh,
         self.cfg.prediction_thresh, self.cfg.chunk_size)
@@ -398,9 +401,12 @@ class SrchVolEval(SemSegEval):
       srchvol_mask_cls = torch.cat(cls_to_append, dim=0)
 
     if mapper.global_vox_xyz is not None and mapper.global_vox_xyz.shape[0] > 0:
+      feats = mapper.global_vox_feat
+      if (self.feat_compressor is not None and 
+          not self.cfg.querying.compressed):
+        feats = self.feat_compressor.decompress(feats)
       feats = self.encoder.align_spatial_features_with_language(
-        mapper.global_vox_feat.unsqueeze(-1).unsqueeze(-1)
-      ).squeeze(-1).squeeze(-1)
+        feats.unsqueeze(-1).unsqueeze(-1)).squeeze(-1).squeeze(-1)
 
       vox_preds = eval_utils.compute_semseg_preds(
         feats, feat_queries, self.cfg.prompt_denoising_thresh,
@@ -417,7 +423,10 @@ class SrchVolEval(SemSegEval):
       unobserved_xyz, srchvol_mask, srchvol_mask_cls)
     m["is_def_pred"] = is_default_pred
 
-    if vis and self.vis is not None:
+    if (vis and self.vis is not None and
+        mapper.global_rays_orig_angles is not None and
+        mapper.global_rays_orig_angles.shape[0] > 0):
+
       self.vis.log_label_pc(mapper.global_vox_xyz, vox_preds,
                             layer="predictions/voxels")
       ray_orig = mapper.global_rays_orig_angles[:, :3]
@@ -503,6 +512,11 @@ class SrchVolEval(SemSegEval):
                                             self.dataset.rgb_w)
     self.encoder = hydra.utils.instantiate(self.cfg.encoder, **encoder_kwargs)
 
+    self.feat_compressor = None
+    if self.cfg.mapping.feat_compressor is not None:
+      self.feat_compressor = hydra.utils.instantiate(
+        self.cfg.mapping.feat_compressor)
+
     ## 3. Compute text embeddings.
     if self.cache_is_valid("text_embeds"):
       logger.info("Loading cached text embeddings...")
@@ -522,7 +536,8 @@ class SrchVolEval(SemSegEval):
     mapper = hydra.utils.instantiate(
       self.cfg.mapping, encoder=self.encoder,
       intrinsics_3x3=self.dataset.intrinsics_3x3, visualizer=self.vis,
-      occ_pruning_period=-1, clip_bbox=bbox)
+      occ_pruning_period=-1, clip_bbox=bbox,
+      feat_compressor=self.feat_compressor)
     for _, _ in self.mapping_loop(mapper):
       if (i != 0 and i % self.cfg.online_eval_period == 0):
         results_dict[i] = self.srchvol_eval(mapper,

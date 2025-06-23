@@ -12,8 +12,4 @@ pose_period: 5
 # Whether to use the same heatmap scale across all logs.
 global_heat_scale: False
 
-# If you already have a precomputed PCA basis .pt file as CxD torch tensor,
-# where C represents the original feature dim and D is > 3 is the compressed
-# dim, then you can pass the path here to avoid recomputing. This will be used
-# to map C dimensional feature vectors into RGB for visualization.
-feat_proj_basis_path: ${feat_proj_basis_path}
+feat_compressor: ${oc.select:feat_compressor, null}

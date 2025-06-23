@@ -8,7 +8,7 @@ from typing import Tuple
 
 import torch
 
-from rayfronts import utils
+from rayfronts import utils, feat_compressors
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +20,8 @@ class Mapping3DVisualizer(abc.ABC):
     img_size: See __init__
     base_point_size: See __init__
     global_heat_scale: See __init__
+    feat_compressor: See __init__
     device: Device to use for computation.
-    basis: a CxD float tensor that has the basis to use for projecting features
-      to RGB space for visualization. Only first 3 PCA components are used
-      (indexed with [:, :3]).
     time_step: Current visualization step
   """
 
@@ -31,7 +29,7 @@ class Mapping3DVisualizer(abc.ABC):
                img_size = None,
                base_point_size: float = None,
                global_heat_scale: bool = False,
-               feat_proj_basis_path: str = None,
+               feat_compressor: feat_compressors.FeatCompressor = None,
                device: str = None,
                **kwargs):
     """
@@ -44,12 +42,8 @@ class Mapping3DVisualizer(abc.ABC):
       base_point_size: size of points/voxels in world units. Set to None to
         leave it up to the visualizer to set a reasonable default.
       global_heat_scale: Whether to use the same heatmap scale across all logs.
-      feat_proj_basis_path: A .pt path to a CxD float tensor that has the basis
-        to use for projecting features to RGB space for visualization. Only
-        first 3 PCA components are used (indexed with [:, :3]).
-        if set to None, then a PCA basis will be computed on the first call to
-        either log_feature_pc, log_feature_image, or log feature_arrows and used
-        for all subsequent calls.
+      feat_compressor: Compressor used to compress features before visualization
+        If set to None, then PCA is computed on the first feature vis call.
     """
     self.intrinsics_3x3 = intrinsics_3x3
     self.img_size = img_size
@@ -63,16 +57,10 @@ class Mapping3DVisualizer(abc.ABC):
 
     self.time_step = 0
 
-    # Load basis if path is provided.
-    if feat_proj_basis_path is None:
-      self.basis = None
+    if feat_compressor is None:
+      self.feat_compressor = feat_compressors.PcaCompressor(3)
     else:
-      self.basis = torch.load(feat_proj_basis_path,
-                              weights_only=True).to(self.device)
-      if len(self.basis.shape) != 2:
-        raise ValueError(f"Invalid basis loaded from {feat_proj_basis_path}. "
-                         f"Expected shape CxD but found {self.basis.shape}.")
-      self.basis = self.basis[:, :3]
+      self.feat_compressor = feat_compressor
 
     # Running max and min to use for normalizing the features for visualization.
     self._projected_feats_max = None
@@ -407,12 +395,11 @@ class Mapping3DVisualizer(abc.ABC):
       self, feats: torch.FloatTensor) -> torch.FloatTensor:
     """Projects features to RGB space for visualization.
 
-    Uses a precomputed PCA basis to project the features to 3 channels
-    corresponding to RGB. If no basis is available, then computes a basis.
-    If number of channels C was <=3 then no PCA will be used and the channels
-    will be zero padded to 3 if necessary. 
-    If number of points N was <3 preventing computing a PCA basis with 3 
-    components, then the first 3 components will be selected.
+    Uses the provided feature compressor or PCA to get 3 channels corresponding
+    to RGB. If the feature compressor is not fitted, will attempt to fit it
+    with 'feats'. If it fails, then it just selects the first 3 features. If
+    it succeeds, it uses the feature compressor to compress the features then
+    select the first 3 features for visualization.
 
     Args:
       feats: (*xC) Float tensor describing features.
@@ -421,24 +408,19 @@ class Mapping3DVisualizer(abc.ABC):
     assert C > 0
     output_shape = list(feats.shape)
     output_shape[-1] = 3
-
-    feats_flat = feats.reshape(-1, C)
     if C > 3:
-
-      if ((self.basis is None or self.basis.shape[0] != C) and
-          feats_flat.shape[0] >= 3):
-        if self.basis is not None:
-          logger.warning("Loaded basis does not match features given. "
-                         "Computing a new basis.")
-        U, S, V = torch.pca_lowrank(feats_flat, q = 3)
-        self.basis = V
-        # Computed a new basis. Let's reset the min max for normalization.
-        self._projected_feats_min = None
-        self._projected_feats_max = None
-      if feats_flat.shape[0] < 3:
-        feats = feats_flat[:, :3].reshape(*output_shape)
+      if self.feat_compressor.is_fitted():
+        feats = self.feat_compressor.compress(feats)[..., :3]
       else:
-        feats = (feats_flat @ self.basis).reshape(*output_shape)
+        try:
+          self.feat_compressor.fit(feats)
+          # Fitted compressor to new distribution. Let's reset the min max 
+          # for normalization.
+          self._projected_feats_min = None
+          self._projected_feats_max = None
+          feats = self.feat_compressor.compress(feats)[..., :3]
+        except:
+          feats = feats[..., :3]
     elif C < 3:
       feats_flat = torch.nn.functional.pad(feats_flat, (0, 0, 0, 3-C))
       feats = feats_flat.reshape(*output_shape)

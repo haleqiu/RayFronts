@@ -20,7 +20,8 @@ from typing_extensions import override, List, Dict, Tuple
 import torch
 
 from rayfronts.mapping.base import SemanticRGBDMapping
-from rayfronts import geometry3d as g3d, image_encoders, visualizers
+from rayfronts import (geometry3d as g3d, image_encoders, visualizers,
+                       feat_compressors)
 from rayfronts.utils import compute_cos_sim
 
 class SemanticVoxelMap(SemanticRGBDMapping):
@@ -37,8 +38,7 @@ class SemanticVoxelMap(SemanticRGBDMapping):
     visualizer: See base.
     clip_bbox: See base
     encoder: See base.
-    stored_feat_dim: See base.
-    basis: See base.
+    feat_compressor: See base.
     interp_mode: See base.
   
     max_pts_per_frame: See __init__.
@@ -58,8 +58,7 @@ class SemanticVoxelMap(SemanticRGBDMapping):
                visualizer: visualizers.Mapping3DVisualizer = None,
                clip_bbox: Tuple[Tuple] = None,
                encoder: image_encoders.ImageSpatialEncoder = None,
-               stored_feat_dim: int = -1,
-               feat_proj_basis_path: str = None,
+               feat_compressor: feat_compressors.FeatCompressor = None,
                interp_mode: str = "bilinear",
                max_pts_per_frame: int = 1000,
                vox_size: int = 1,
@@ -73,8 +72,7 @@ class SemanticVoxelMap(SemanticRGBDMapping):
       visualizer: See base.
       clip_bbox: See base.
       encoder: See base.
-      stored_feat_dim: See base.
-      feat_proj_basis_path: See base.
+      feat_compressor: See base.
       interp_mode: See base.
 
       max_pts_per_frame: How many points to project per frame. Set to -1 to 
@@ -89,7 +87,7 @@ class SemanticVoxelMap(SemanticRGBDMapping):
     """
 
     super().__init__(intrinsics_3x3, device, visualizer, clip_bbox, encoder,
-                     stored_feat_dim, feat_proj_basis_path, interp_mode)
+                     feat_compressor, interp_mode)
 
     self.max_pts_per_frame = max_pts_per_frame
     self.interp_mode = interp_mode
@@ -274,7 +272,7 @@ class SemanticVoxelMap(SemanticRGBDMapping):
                            layer="voxel_rgb")
     if self.encoder is not None:
       self.visualizer.log_feature_pc(self.global_vox_xyz, self.global_vox_feat,
-                                    layer="voxel_feature_pca")
+                                     layer="voxel_feature")
     log_hit_count = torch.log2(self.global_vox_conf.squeeze())
     self.visualizer.log_heat_pc(self.global_vox_xyz, log_hit_count,
                                 layer="voxel_log_hit_count")
@@ -287,13 +285,18 @@ class SemanticVoxelMap(SemanticRGBDMapping):
   @override
   def feature_query(self,
                     feat_query: torch.FloatTensor,
-                    softmax: bool = False)-> dict:
+                    softmax: bool = False,
+                    compressed: bool = True)-> dict:
     if self.is_empty():
       return
     vox_feat = self.global_vox_feat
+
+    if self.feat_compressor is not None and not compressed:
+      vox_feat = self.feat_compressor.decompress(vox_feat)
+
     vox_feat = self.encoder.align_spatial_features_with_language(
       vox_feat.unsqueeze(-1).unsqueeze(-1)
-    ).squeeze()
+    ).squeeze(-1).squeeze(-1)
 
     r = compute_cos_sim(feat_query, vox_feat, softmax=softmax).T
     return dict(vox_xyz=self.global_vox_xyz, vox_sim=r)

@@ -8,6 +8,7 @@ import torch
 from rayfronts.utils import compute_cos_sim
 from rayfronts.visualizers import Mapping3DVisualizer
 from rayfronts.image_encoders import ImageSpatialEncoder
+from rayfronts.feat_compressors import FeatCompressor
 
 class RGBDMapping(abc.ABC):
   """Base interface for all maps taking posed RGBD as input.
@@ -168,8 +169,7 @@ class SemanticRGBDMapping(RGBDMapping):
                visualizer: Mapping3DVisualizer = None,
                clip_bbox: Tuple[Tuple] = None,
                encoder: ImageSpatialEncoder = None,
-               stored_feat_dim: int = -1,
-               feat_proj_basis_path: str = None,
+               feat_compressor: FeatCompressor = None,
                interp_mode: str = "bilinear"):
     """
     Args:
@@ -192,20 +192,13 @@ class SemanticRGBDMapping(RGBDMapping):
     super().__init__(intrinsics_3x3, device, visualizer, clip_bbox)
     self.encoder = encoder
     self.interp_mode = interp_mode
-    self.stored_feat_dim = stored_feat_dim
-
-    if (encoder is not None and
-        stored_feat_dim > 0 and
-        feat_proj_basis_path is not None):
-      self.basis = torch.load(feat_proj_basis_path).to(self.device)
-      self.basis = self.basis[:, :stored_feat_dim]
-    else:
-      self.basis = None
+    self.feat_compressor = feat_compressor
 
   @abc.abstractmethod
   def feature_query(self,
                     feat_query: torch.FloatTensor,
-                    softmax: bool = False) -> dict:
+                    softmax: bool = False,
+                    compressed: bool = False) -> dict:
     """Queries map using features in the same feature space as stored features.
     
     Args:
@@ -213,6 +206,9 @@ class SemanticRGBDMapping(RGBDMapping):
         of the features. 
       softmax: If True, a softmax across queries is taken making a result of 
         feat_query[i] dependent on all other queries in the batch.
+      compressed: Whether to query the map in compressed feature space.
+        Only relevant if the map was using a feature compressor. If True,
+        then feat_query must be in compressed feature space already.
     Returns:
       Query result as a dictionary mapping names to results which is child class
       dependent..
@@ -220,7 +216,8 @@ class SemanticRGBDMapping(RGBDMapping):
     pass
 
   def text_query(self, text_query: List[str], query_type = "labels",
-                 softmax: bool = False) -> dict:
+                 softmax: bool = False,
+                 compressed: bool = False) -> dict:
     """Queries the representation using textual labels or prompts.
     
     Args:
@@ -229,6 +226,8 @@ class SemanticRGBDMapping(RGBDMapping):
         prompt templates whereas prompts are encoded directly.
       softmax: If True, a softmax across queries is taken making a result of 
         query[i] dependent on all other queries in the batch.
+      compressed: Whether to query the map in compressed feature space.
+        Only relevant if the map was using a feature compressor.
     Returns:
       Query result as a dictionary mapping names to results which is child class
       dependent.
@@ -242,12 +241,16 @@ class SemanticRGBDMapping(RGBDMapping):
       feat_query = self.encoder.encode_prompts(text_query)
     else:
       raise ValueError("Invalid query type")
+    
+    if self.feat_compressor is not None and compressed:
+      feat_query = self.feat_compressor.compress(feat_query)
 
-    return self.feature_query(feat_query, softmax=softmax)
+    return self.feature_query(feat_query, softmax, compressed)
 
 
   def image_query(self, img_query: torch.FloatTensor,
-                  softmax: bool = False) -> dict:
+                  softmax: bool = False,
+                  compressed: bool = False) -> dict:
     """Queries the representation using images.
     
     Args:
@@ -257,6 +260,8 @@ class SemanticRGBDMapping(RGBDMapping):
         prompt templates whereas prompts are encoded directly.
       softmax: If True, a softmax across queries is taken making a result of 
         query[i] dependent on all other queries in the batch.
+      compressed: Whether to query the map in compressed feature space.
+        Only relevant if the map was using a feature compressor.
     Returns:
       Query result as a dictionary mapping names to results which is child class
       dependent.
@@ -267,7 +272,10 @@ class SemanticRGBDMapping(RGBDMapping):
 
     feat_query = self.encoder.encode_image_to_vector(img_query)
 
-    return self.feature_query(feat_query, softmax=softmax)
+    if self.feat_compressor is not None and compressed:
+      feat_query = self.feat_compressor.compress(feat_query)
+
+    return self.feature_query(feat_query, softmax, compressed)
 
   @abc.abstractmethod
   def vis_query_result(self,
@@ -288,7 +296,7 @@ class SemanticRGBDMapping(RGBDMapping):
     pass
 
   def _compute_proj_resize_feat_map(self, rgb_img, h, w):
-    """Encodes the RGB image to a feature map, project with PCA, and resize.
+    """Encodes the RGB image to a feature map, compress if needed, and resize.
     
     Args:
       rgb_img: (Bx3xHxW) Float tensor with values in [0-1].
@@ -298,15 +306,12 @@ class SemanticRGBDMapping(RGBDMapping):
     feat_img = self.encoder.encode_image_to_feat_map(rgb_img)
     B, FC, FH, FW = feat_img.shape
 
-    proj = 0 < self.stored_feat_dim < FC
-    if proj:
-      feat_img = feat_img.permute(0, 2, 3, 1).reshape(-1, FC)
-      if self.basis is None:
-        U,S,V = torch.pca_lowrank(feat_img, q = 3)
-        self.basis = V
-      feat_img = feat_img @ self.basis
-      feat_img = feat_img.reshape(B, FH, FW, -1).permute(0, 3, 1, 2)
-      B, FC, FH, FW = feat_img.shape
+    if self.feat_compressor is not None:
+      if not self.feat_compressor.is_fitted():
+        self.feat_compressor.fit(feat_img.permute(0, 2, 3, 1))
+      
+      feat_img = self.feat_compressor.compress(feat_img.permute(0, 2, 3, 1))
+      feat_img = feat_img.permute(0, 3, 1, 2)
 
     # TODO: This can be very large. Make this more memory efficient.
     # it is theoritically possible to only interpolate the indices of interest

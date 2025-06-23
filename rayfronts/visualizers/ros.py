@@ -30,7 +30,7 @@ except ModuleNotFoundError:
   logger.warning("ROS2 modules not found !")
 
 from rayfronts.visualizers.base import Mapping3DVisualizer
-from rayfronts import utils, geometry3d as g3d
+from rayfronts import geometry3d as g3d, feat_compressors
 
 
 class Ros2Vis(Mapping3DVisualizer):
@@ -45,7 +45,7 @@ class Ros2Vis(Mapping3DVisualizer):
     base_point_size: See base.
     global_heat_scale: See base.
     device: See base.
-    basis: See base.
+    feat_compressor: See base.
     time_step: See base.
   """
 
@@ -54,7 +54,7 @@ class Ros2Vis(Mapping3DVisualizer):
                img_size: Tuple[int] = None,
                base_point_size: float = None,
                global_heat_scale: bool = False,
-               feat_proj_basis_path: str = None,
+               feat_compressor: feat_compressors.FeatCompressor = None,
                topic_prefix: str = "rayfronts",
                reliability: str = "best_effort",
                **kwargs):
@@ -65,13 +65,13 @@ class Ros2Vis(Mapping3DVisualizer):
       img_size: See base.
       base_point_size: See base.
       global_heat_scale: See base.
-      feat_proj_basis_path: See base.
+      feat_compressor: See base.
       topic_prefix: Prefix for the ROS2 topics.
       reliability: Reliability of the ROS2 topics. Can be "reliable" or
         "best_effort".
     """
     super().__init__(intrinsics_3x3, img_size, base_point_size,
-                     global_heat_scale, feat_proj_basis_path)
+                     global_heat_scale, feat_compressor)
 
     if not rclpy.ok():
       rclpy.init()

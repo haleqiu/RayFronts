@@ -78,6 +78,11 @@ class MappingServer:
     mapper_kwargs = dict()
 
     self.encoder: image_encoders.ImageEncoder = None
+    self.feat_compressor = None
+    if self.cfg.mapping.feat_compressor is not None:
+      self.feat_compressor = hydra.utils.instantiate(
+        self.cfg.mapping.feat_compressor)
+
     if init_encoder:
       encoder_kwargs = dict()
       if (cfg.querying.text_query_mode is not None and
@@ -90,6 +95,7 @@ class MappingServer:
 
       self.encoder = hydra.utils.instantiate(cfg.encoder, **encoder_kwargs)
       mapper_kwargs["encoder"] = self.encoder
+      mapper_kwargs["feat_compressor"] = self.feat_compressor
 
     self.mapper: mapping.RGBDMapping = hydra.utils.instantiate(
       cfg.mapping, intrinsics_3x3=intrinsics_3x3, visualizer=self.vis,
@@ -184,6 +190,17 @@ class MappingServer:
 
     queries_labels = dict(text=text_queries, img=img_queries)
     queries_feats = dict(text=text_queries_feats, img=img_queries_feats)
+    if (self.feat_compressor is not None and
+        self.cfg.querying.compressed):
+      if not self.feat_compressor.is_fitted():
+        logger.warning("The feature compressor was not fitted. "
+                       "Will try to fit to query features which may fail.")
+        l = [x for x in queries_feats.values() if x is not None]
+        self.feat_compressor.fit(torch.cat(l, dim=0))
+      for k,v in queries_feats.items():
+        if v is None:
+          continue
+        queries_feats[k] = self.feat_compressor.compress(v)
 
     with self._query_lock:
       if self._queries_feats is None:
@@ -220,7 +237,8 @@ class MappingServer:
           if v is None or len(v) < 1:
             continue
           r = self.mapper.feature_query(
-            self._queries_feats[k], softmax=self.cfg.querying.compute_prob)
+            self._queries_feats[k], softmax=self.cfg.querying.compute_prob,
+            compressed=self.cfg.querying.compressed)
           if self.vis is not None and r is not None:
             self.mapper.vis_query_result(r, vis_labels=v, **kwargs)
 
@@ -268,7 +286,7 @@ class MappingServer:
           self.vis.log_pose(batch["pose_4x4"][-1])
         if i % self.cfg.vis.input_period == 0:
           self.vis.log_img(batch["rgb_img"][-1].permute(1,2,0))
-          self.vis.log_depth_img(batch["depth_img"][-1].squeeze())
+          self.vis.log_depth_img(depth_img.cpu()[-1].squeeze())
 
       map_t0 = time.time()
       r = self.mapper.process_posed_rgbd(rgb_img, depth_img, pose_4x4, **kwargs)

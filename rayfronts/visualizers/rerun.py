@@ -13,7 +13,7 @@ import rerun as rr
 import torch
 
 from rayfronts.visualizers.base import Mapping3DVisualizer
-from rayfronts import utils
+from rayfronts import feat_compressors
 
 class RerunVis(Mapping3DVisualizer):
   """Semantic RGBD visualizer using ReRun.io
@@ -24,7 +24,7 @@ class RerunVis(Mapping3DVisualizer):
     base_point_size: See base.
     global_heat_scale: See base.
     device: See base.
-    basis: See base.
+    feat_compressor: See base.
     time_step: See base.
     split_label_vis: See __init__.
   """
@@ -34,7 +34,7 @@ class RerunVis(Mapping3DVisualizer):
                img_size: Tuple[int] = None,
                base_point_size: float = None,
                global_heat_scale: bool = False,
-               feat_proj_basis_path: str = None,
+               feat_compressor: feat_compressors.FeatCompressor = None,
                split_label_vis: bool = False,
                **kwargs):
     """
@@ -44,12 +44,12 @@ class RerunVis(Mapping3DVisualizer):
       img_size: See base.
       base_point_size: See base.
       global_heat_scale: See base.
-      feat_proj_basis_path: See base.
+      feat_compressor: See base.
       split_label_vis: Whether to log labeled points and arrows to different
         layers in rerun or not.
     """
     super().__init__(intrinsics_3x3, img_size, base_point_size,
-                     global_heat_scale, feat_proj_basis_path)
+                     global_heat_scale, feat_compressor)
 
     rr.init("semantic_mapping_vis", spawn=True)
     rr.set_time_seconds("stable_time", 0)

@@ -15,10 +15,6 @@ max_pts_per_frame: 1000
 # voxelization.
 vox_accum_period: 8
 
-# Length of the feature dimension to store. If smaller than encoder output 
-# then PCA is used to compress. Set to -1 to use full encoder output.
-stored_feat_dim: -1
-
-feat_proj_basis_path: ${feat_proj_basis_path}
+feat_compressor: ${oc.select:feat_compressor, null}
 
 interp_mode: ${interp_mode}

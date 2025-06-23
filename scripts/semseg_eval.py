@@ -132,7 +132,8 @@ class SemSegEval:
                     "mapping.max_pts_per_frame", "dataset"],
       "map": ["seed", "mapping", "dataset", "encoder", "eval_period"],
       "text_embeds": ["seed", "encoder", "classes_to_ignore",
-                      "classes_to_eval"],
+                      "classes_to_eval", "feat_compressor",
+                      "querying.compressed"],
     }
     t = self.cache_validity_props
     t["semseg_preds"] = t["text_embeds"] + t["semseg_gt"] + t["map"] + \
@@ -260,6 +261,15 @@ class SemSegEval:
     else:
       raise ValueError("Invalid query type")
 
+    if (self.feat_compressor is not None and
+        self.cfg.querying.compressed):
+      if not self.feat_compressor.is_fitted():
+        logger.warning("The feature compressor was not fitted. "
+                       "Will try to fit to text features which may fail.")
+        self.feat_compressor.fit(text_embeds)
+
+      text_embeds = self.feat_compressor.compress(text_embeds)
+
     return text_embeds
 
   def mapping_loop(self, mapper):
@@ -285,7 +295,7 @@ class SemSegEval:
           self.vis.log_pose(batch["pose_4x4"][-1])
         if i % self.cfg.vis.input_period == 0:
           self.vis.log_img(batch["rgb_img"][-1].permute(1,2,0))
-          self.vis.log_depth_img(batch["depth_img"][-1].squeeze())
+          self.vis.log_depth_img(depth_img.cpu()[-1].squeeze())
 
       r = mapper.process_posed_rgbd(rgb_img, depth_img, pose_4x4)
 
@@ -376,6 +386,9 @@ class SemSegEval:
   def predict_and_semseg_eval(self, semseg_gt_xyz, semseg_gt_label,
                               feats_xyz, feats_feats, text_embeds,
                               vis=True):
+    if (self.feat_compressor is not None and 
+        not self.cfg.querying.compressed):
+      feats_feats = self.feat_compressor.decompress(feats_feats)
     feats_lang_feats = \
       self.encoder.align_spatial_features_with_language(
         feats_feats.unsqueeze(-1).unsqueeze(-1)).squeeze(-1).squeeze(-1)
@@ -578,6 +591,11 @@ class SemSegEval:
                                             self.dataset.rgb_w)
     self.encoder = hydra.utils.instantiate(self.cfg.encoder, **encoder_kwargs)
 
+    self.feat_compressor = None
+    if self.cfg.mapping.feat_compressor is not None:
+      self.feat_compressor = hydra.utils.instantiate(
+        self.cfg.mapping.feat_compressor)
+    
     ## 2. Compute text embeddings.
     if self.cache_is_valid("text_embeds"):
       logger.info("Loading cached text embeddings...")
@@ -603,7 +621,8 @@ class SemSegEval:
 
       mapper = hydra.utils.instantiate(
         self.cfg.mapping, encoder=self.encoder,
-        intrinsics_3x3=self.dataset.intrinsics_3x3, visualizer=self.vis)
+        intrinsics_3x3=self.dataset.intrinsics_3x3, visualizer=self.vis,
+        feat_compressor=self.feat_compressor)
       for feats_xyz, feats_feats in self.mapping_loop(mapper):
         if (i != 0 and self.cfg.online_eval_period > 0 and
             i % self.cfg.online_eval_period == 0):

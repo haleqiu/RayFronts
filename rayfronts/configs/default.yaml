@@ -5,22 +5,17 @@ defaults:
   - encoder: "naradio"
   - vis: "rerun" # Set to null to disable
   - messaging_service: null # Set to null to disable
+  - feat_compressor: null # Set to null to disable
   - extras
 
 # Disable logging to files
-hydra:  
-  output_subdir: null  
-  run:  
+hydra:
+  output_subdir: null
+  run:
     dir: .
 
-# How many frames should batched before processing.
+# How many frames should be batched before processing.
 batch_size: 1
-
-# If you already have a precomputed PCA basis .pt file as CxD torch tensor,
-# where C represents the original feature dim and D is the compressed dim, then
-# you can pass the path here to avoid recomputing based on a single frame.
-# This will be used for both visualization and mapping by default.
-feat_proj_basis_path: null
 
 # Imposing a depth limit on the data such that to test limited depth scenarios
 # Set to a negative number to not use a limit
@@ -37,6 +32,10 @@ querying:
   # labels then every line will be considered as a label that will be injected 
   # into multiple prompt templates and averaged out to get the text embedding.
   text_query_mode: null # [null, "labels", "prompts"]
+
+  # Whether to query in compressed feature space or decompress first. Only used
+  # if feat_compressor was used.
+  compressed: False
 
   # A query file used to initialize the list of queries will be used to query
   # the map periodically and visualizing the results.

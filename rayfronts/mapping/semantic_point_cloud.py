@@ -21,7 +21,7 @@ from typing_extensions import override, List, Dict, Tuple
 import torch
 
 from rayfronts.mapping.base import SemanticRGBDMapping
-from rayfronts import geometry3d, image_encoders, visualizers
+from rayfronts import geometry3d, image_encoders, visualizers, feat_compressors
 from rayfronts.utils import compute_cos_sim
 
 class SemanticPointCloud(SemanticRGBDMapping):
@@ -43,8 +43,7 @@ class SemanticPointCloud(SemanticRGBDMapping):
     device: See base.
     visualizer: See base.
     encoder: See base.
-    stored_feat_dim: See base.
-    basis: See base.
+    feat_compressor: See base.
     interp_mode: See base.
 
     max_pts_per_frame: See __init__.
@@ -62,8 +61,7 @@ class SemanticPointCloud(SemanticRGBDMapping):
                visualizer: visualizers.Mapping3DVisualizer = None,
                clip_bbox: Tuple[Tuple] = None,
                encoder: image_encoders.ImageSpatialEncoder = None,
-               stored_feat_dim = -1,
-               feat_proj_basis_path = None,
+               feat_compressor: feat_compressors.FeatCompressor = None,
                interp_mode: str = "bilinear",
                max_pts_per_frame: int = 1000):
     """
@@ -73,8 +71,7 @@ class SemanticPointCloud(SemanticRGBDMapping):
       visualizer: See base.
       clip_bbox: See base.
       encoder: See base.
-      stored_feat_dim: See base.
-      feat_proj_basis_path: See base.
+      feat_compressor: See base.
       interp_mode: See base.
 
       max_pts_per_frame: How many points to project per frame ? Set to -1 to
@@ -82,7 +79,7 @@ class SemanticPointCloud(SemanticRGBDMapping):
         sampled.
     """
     super().__init__(intrinsics_3x3, device, visualizer, clip_bbox, encoder,
-                     stored_feat_dim, feat_proj_basis_path, interp_mode)
+                     feat_compressor, interp_mode)
 
     self.max_pts_per_frame = max_pts_per_frame
 
@@ -181,15 +178,19 @@ class SemanticPointCloud(SemanticRGBDMapping):
   @override
   def feature_query(self,
                     feat_query: torch.FloatTensor,
-                    softmax: torch.FloatTensor = False) -> dict:
+                    softmax: torch.FloatTensor = False,
+                    compressed: bool = True) -> dict:
     if self.is_empty():
       return
 
     self._concat()
     pc_feat = self.global_pc_feat[-1]
+    if self.feat_compressor is not None and not compressed:
+      pc_feat = self.feat_compressor.decompress(pc_feat)
+
     pc_feat = self.encoder.align_spatial_features_with_language(
       pc_feat.unsqueeze(-1).unsqueeze(-1)
-    ).squeeze()
+    ).squeeze(-1).squeeze(-1)
 
     r = compute_cos_sim(feat_query, pc_feat, softmax=softmax).T
     return dict(pc_xyz=self.global_pc_xyz[-1], pc_sim=r)
