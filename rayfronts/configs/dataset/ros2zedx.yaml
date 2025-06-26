@@ -4,7 +4,7 @@ defaults:
 _target_: rayfronts.datasets.Ros2Subscriber
 
 # Topic containing RGB images of type sensor_msgs/msg/Image
-rgb_topic: "/zed/zed_node/right/image_rect_color"
+rgb_topic: "/zed/zed_node/left/image_rect_color"
 
 # Topic containing poses of type geometry_msgs/msg/PoseStamped
 pose_topic: "/zed/zed_node/pose"
