@@ -27,3 +27,4 @@ dependencies:
     - hydra-core
     - nanobind
     - tqdm
+    - gradio
