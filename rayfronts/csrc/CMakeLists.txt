@@ -24,8 +24,8 @@ find_package(nanobind CONFIG REQUIRED)
 nanobind_add_module(rayfronts_cpp NOMINSIZE mapping/vdb_mapping.cpp)
 
 # find_package(OpenVDB REQUIRED) FIXME
-set(OPENVDB_INCLUDE_DIR "$ENV{CMAKE_INSTALL_PREFIX}/include/")
-set(OPENVDB_LIBRARY_DIRS "$ENV{CMAKE_INSTALL_PREFIX}/lib")
+set(OPENVDB_INCLUDE_DIR "$ENV{CONDA_PREFIX}/include/")
+set(OPENVDB_LIBRARY_DIRS "$ENV{CONDA_PREFIX}/lib")
 set(OPENVDB_LIBRARIES "tbb" "openvdb")
 target_include_directories(rayfronts_cpp PUBLIC ${OPENVDB_INCLUDE_DIR})
 target_link_directories(rayfronts_cpp PUBLIC ${OPENVDB_LIBRARY_DIRS})

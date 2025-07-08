@@ -27,10 +27,10 @@ class Mapping3DVisualizer(abc.ABC):
 
   def __init__(self, intrinsics_3x3: torch.FloatTensor,
                img_size = None,
-               base_point_size: float = None,
+               base_point_size: float | None = None,
                global_heat_scale: bool = False,
-               feat_compressor: feat_compressors.FeatCompressor = None,
-               device: str = None,
+               feat_compressor: feat_compressors.FeatCompressor | None = None,
+               device: str | None = None,
                **kwargs):
     """
 
@@ -71,7 +71,7 @@ class Mapping3DVisualizer(abc.ABC):
     self._heat_max = None
     self._heat_min = None
 
-  def _preprocess_img(self, img: torch.FloatTensor) -> torch.FloatTensor:
+  def _preprocess_img(self, img: torch.Tensor) -> torch.Tensor:
     """Resize image to self.img_size if needed
     
     Args:
@@ -129,8 +129,8 @@ class Mapping3DVisualizer(abc.ABC):
   @abc.abstractmethod
   def log_pc(self,
              pc_xyz: torch.FloatTensor,
-             pc_rgb: torch.FloatTensor = None,
-             pc_radii: torch.FloatTensor = None,
+             pc_rgb: torch.FloatTensor | None = None,
+             pc_radii: torch.FloatTensor | None = None,
              layer: str = "pc") -> None:
     """Point cloud logging primitive. Must be implemented by child class.
 
@@ -147,7 +147,7 @@ class Mapping3DVisualizer(abc.ABC):
   def log_arrows(self,
                  arr_origins: torch.FloatTensor,
                  arr_dirs: torch.FloatTensor,
-                 arr_rgb: torch.FloatTensor = None,
+                 arr_rgb: torch.FloatTensor | None = None,
                  layer: str = "arr") -> None:
     """Arrow logging primitive. Must be implemented by child class.
     
@@ -214,7 +214,7 @@ class Mapping3DVisualizer(abc.ABC):
   def log_label_arrows(self,
                        arr_origins: torch.FloatTensor,
                        arr_dirs: torch.FloatTensor,
-                       arr_labels: torch.LongTensor = None,
+                       arr_labels: torch.LongTensor | None = None,
                        layer: str = "arr_label") -> None:
     """Logs arrows where each arrow has a numerical label.
     
@@ -232,7 +232,7 @@ class Mapping3DVisualizer(abc.ABC):
 
   ## Heat variants of logging.
 
-  def _normalize_heat(self, heat: torch.FloatTensor) -> torch.FloatTensor:
+  def _normalize_heat(self, heat: torch.Tensor) -> torch.Tensor:
     """Normalizes a list of heat values to be within [0-1] range.
     
     If global_heat_scale is True, then keeps a running min and max for
@@ -262,8 +262,8 @@ class Mapping3DVisualizer(abc.ABC):
 
   def log_heat_img(self,
                    img_heat: torch.LongTensor,
-                   high_color: Tuple[int] = (253, 231, 37),
-                   low_color: Tuple[int] = (68, 1, 84),
+                   high_color: Tuple[int, int, int] = (253, 231, 37),
+                   low_color: Tuple[int, int, int] = (68, 1, 84),
                    layer: str = "img_heat",
                    pose_layer: str = "pose") -> None:
     """Logs a heat map.
@@ -280,10 +280,10 @@ class Mapping3DVisualizer(abc.ABC):
     raise NotImplementedError()
 
   def log_heat_pc(self,
-                  pc_xyz: torch.FloatTensor,
-                  pc_heat: torch.FloatTensor = None,
-                  high_color: Tuple[int] = (253, 231, 37),
-                  low_color: Tuple[int] = (68, 1, 84),
+                  pc_xyz: torch.Tensor,
+                  pc_heat: torch.Tensor | None = None,
+                  high_color: Tuple[int, int, int] = (253, 231, 37),
+                  low_color: Tuple[int, int, int] = (68, 1, 84),
                   vis_thresh: float = 0,
                   scale_size: bool = False,
                   layer: str = "pc_heat") -> None:
@@ -301,6 +301,7 @@ class Mapping3DVisualizer(abc.ABC):
       scale_size: Whether the point size should scale with the normalized heat.
       layer: Name of layer to log to. Interpretation varies by child class.
     """
+    assert pc_heat is not None, "pc_heat must be provided"
     if pc_xyz.shape[0] == 0:
       return
     pc_heat = self._normalize_heat(pc_heat).unsqueeze(-1)
@@ -318,11 +319,11 @@ class Mapping3DVisualizer(abc.ABC):
     self.log_pc(pc_xyz, cmapped_pc, radii, layer=layer)
 
   def log_heat_arrows(self,
-                      arr_origins: torch.FloatTensor,
-                      arr_dirs: torch.FloatTensor,
-                      arr_heat: torch.FloatTensor,
-                      high_color: Tuple[int] = (253, 231, 37),
-                      low_color: Tuple[int] = (68, 1, 84),
+                      arr_origins: torch.Tensor,
+                      arr_dirs: torch.Tensor,
+                      arr_heat: torch.Tensor,
+                      high_color: Tuple[int, int, int] = (253, 231, 37),
+                      low_color: Tuple[int, int, int] = (68, 1, 84),
                       vis_thresh: float = 0,
                       scale_size: bool = False,
                       layer: str = "arr_heat") -> None:
@@ -361,7 +362,7 @@ class Mapping3DVisualizer(abc.ABC):
   ## Featurized variants of logging
 
   def _normalize_projected_feats(
-      self, proj_feats: torch.FloatTensor) -> torch.FloatTensor:
+      self, proj_feats: torch.Tensor) -> torch.Tensor:
     """Normalizes features already projected to 3 values.
 
     Keeps track of normalizing values to use across calls.
@@ -459,7 +460,7 @@ class Mapping3DVisualizer(abc.ABC):
   def log_feature_arr(self,
                       arr_origins: torch.FloatTensor,
                       arr_dirs: torch.FloatTensor,
-                      arr_feats: torch.FloatTensor = None,
+                      arr_feats: torch.FloatTensor,
                       layer: str = "arr_feat") -> None:
     """Logs arrows colorized by arbitrary features.
 
@@ -478,7 +479,7 @@ class Mapping3DVisualizer(abc.ABC):
   def log_occ_pc(self,
                  pc_xyz: torch.FloatTensor,
                  pc_occ: torch.FloatTensor,
-                 pc_radii: torch.FloatTensor = None,
+                 pc_radii: torch.FloatTensor | None = None,
                  layer: str = "pc_occ"):
     """Log a point cloud / sparse voxel map representing occupancy.
     

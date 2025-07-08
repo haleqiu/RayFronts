@@ -31,10 +31,10 @@ class RerunVis(Mapping3DVisualizer):
 
   def __init__(self,
                intrinsics_3x3: torch.FloatTensor,
-               img_size: Tuple[int] = None,
-               base_point_size: float = None,
+               img_size: Tuple[int] | None = None,
+               base_point_size: float | None = None,
                global_heat_scale: bool = False,
-               feat_compressor: feat_compressors.FeatCompressor = None,
+               feat_compressor: feat_compressors.FeatCompressor | None = None,
                split_label_vis: bool = False,
                **kwargs):
     """
@@ -48,8 +48,8 @@ class RerunVis(Mapping3DVisualizer):
       split_label_vis: Whether to log labeled points and arrows to different
         layers in rerun or not.
     """
-    super().__init__(intrinsics_3x3, img_size, base_point_size,
-                     global_heat_scale, feat_compressor)
+    super().__init__(intrinsics_3x3=intrinsics_3x3, img_size=img_size, base_point_size=base_point_size,
+                     global_heat_scale=global_heat_scale, feat_compressor=feat_compressor)
 
     rr.init("semantic_mapping_vis", spawn=True)
     rr.set_time_seconds("stable_time", 0)
@@ -71,7 +71,7 @@ class RerunVis(Mapping3DVisualizer):
               layer: str = "img",
               pose_layer: str = "pose") -> None:
     self._height, self._width, _ = img.shape
-    rr.log(f"{self._base_name}/{pose_layer}/{layer}", rr.Image(img.cpu()))
+    rr.log(f"{self._base_name}/{pose_layer}/{layer}", rr.Image(img.cpu().numpy()))
 
   @override
   def log_depth_img(self,
@@ -80,7 +80,7 @@ class RerunVis(Mapping3DVisualizer):
                     pose_layer: str = "pose") -> None:
     self._height, self._width = depth_img.shape
     rr.log(f"{self._base_name}/{pose_layer}/{layer}",
-           rr.DepthImage(depth_img.cpu()))
+           rr.DepthImage(depth_img.cpu().numpy()))
 
   @override
   def log_pose(self,
@@ -108,16 +108,14 @@ class RerunVis(Mapping3DVisualizer):
   @override
   def log_pc(self,
              pc_xyz: torch.FloatTensor,
-             pc_rgb: torch.FloatTensor = None,
-             pc_radii: torch.FloatTensor = None,
+             pc_rgb: torch.FloatTensor | None = None,
+             pc_radii: torch.FloatTensor | None = None,
              layer: str = "pc"):
-    super().log_pc(pc_xyz, pc_rgb, layer)
+    super().log_pc(pc_xyz=pc_xyz, pc_rgb=pc_rgb, pc_radii=pc_radii, layer=layer)
     radii = self.base_point_size if pc_radii is None else pc_radii
-    try:
-      radii = radii.cpu()
-    except AttributeError:
-      pass
-    pc_rgb = pc_rgb.cpu() if pc_rgb is not None else pc_rgb
+    if hasattr(radii, 'cpu'):
+      radii = radii.cpu() # type: ignore
+    pc_rgb = pc_rgb.cpu() if pc_rgb is not None else pc_rgb # type: ignore
     rr.log(f"{self._base_name}/{layer}",
            rr.Points3D(positions=pc_xyz.cpu(), colors=pc_rgb, radii=radii))
 
@@ -132,13 +130,14 @@ class RerunVis(Mapping3DVisualizer):
   @override
   def log_label_img(self, img_label, layer="img_label", pose_layer="pose"):
     rr.log(f"{self._base_name}/{pose_layer}/{layer}",
-           rr.SegmentationImage(img_label.cpu()))
+           rr.SegmentationImage(img_label.cpu().numpy()))
 
   @override
   def log_label_pc(self,
                    pc_xyz: torch.FloatTensor,
-                   pc_labels: torch.FloatTensor = None,
+                   pc_labels: torch.FloatTensor | None = None,
                    layer: str = "pc_label"):
+    assert pc_labels is not None, "pc_labels must be provided"
     if (self.split_label_vis and
         len(pc_labels.shape)==1 and
         pc_labels.shape[0] > 0):
