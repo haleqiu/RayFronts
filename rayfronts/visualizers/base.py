@@ -25,7 +25,7 @@ class Mapping3DVisualizer(abc.ABC):
     time_step: Current visualization step
   """
 
-  def __init__(self, intrinsics_3x3: torch.FloatTensor,
+  def __init__(self, intrinsics_3x3: torch.Tensor,
                img_size = None,
                base_point_size: float | None = None,
                global_heat_scale: bool = False,
@@ -99,7 +99,7 @@ class Mapping3DVisualizer(abc.ABC):
 
   @abc.abstractmethod
   def log_pose(self,
-               pose_4x4: torch.FloatTensor,
+               pose_4x4: torch.Tensor,
                layer: str = "pose") -> None:
     """Pose logging primitive. Must be implemented by child class.
 
@@ -114,7 +114,7 @@ class Mapping3DVisualizer(abc.ABC):
 
   @abc.abstractmethod
   def log_img(self,
-              img: torch.FloatTensor,
+              img: torch.Tensor,
               layer: str = "img",
               pose_layer: str = "pose") -> None:
     """Image logging primitive. Must be implemented by child class.
@@ -128,9 +128,9 @@ class Mapping3DVisualizer(abc.ABC):
 
   @abc.abstractmethod
   def log_pc(self,
-             pc_xyz: torch.FloatTensor,
-             pc_rgb: torch.FloatTensor | None = None,
-             pc_radii: torch.FloatTensor | None = None,
+             pc_xyz: torch.Tensor,
+             pc_rgb: torch.Tensor | None = None,
+             pc_radii: torch.Tensor | None = None,
              layer: str = "pc") -> None:
     """Point cloud logging primitive. Must be implemented by child class.
 
@@ -145,9 +145,9 @@ class Mapping3DVisualizer(abc.ABC):
 
   @abc.abstractmethod
   def log_arrows(self,
-                 arr_origins: torch.FloatTensor,
-                 arr_dirs: torch.FloatTensor,
-                 arr_rgb: torch.FloatTensor | None = None,
+                 arr_origins: torch.Tensor,
+                 arr_dirs: torch.Tensor,
+                 arr_rgb: torch.Tensor | None = None,
                  layer: str = "arr") -> None:
     """Arrow logging primitive. Must be implemented by child class.
     
@@ -162,8 +162,8 @@ class Mapping3DVisualizer(abc.ABC):
 
   @abc.abstractmethod
   def log_box(self,
-              box_mins: torch.FloatTensor,
-              box_maxs: torch.FloatTensor,
+              box_mins: torch.Tensor,
+              box_maxs: torch.Tensor,
               layer: str = "box"):
     """Bounding box logging primitive. Must be implemented by child class.
     
@@ -196,7 +196,7 @@ class Mapping3DVisualizer(abc.ABC):
     raise NotImplementedError()
 
   def log_label_pc(self,
-                   pc_xyz: torch.FloatTensor,
+                   pc_xyz: torch.Tensor,
                    pc_labels: torch.LongTensor,
                    layer = "pc_label") -> None:
     """Logs a label point cloud where each point has a numerical label.
@@ -212,8 +212,8 @@ class Mapping3DVisualizer(abc.ABC):
     raise NotImplementedError()
 
   def log_label_arrows(self,
-                       arr_origins: torch.FloatTensor,
-                       arr_dirs: torch.FloatTensor,
+                       arr_origins: torch.Tensor,
+                       arr_dirs: torch.Tensor,
                        arr_labels: torch.LongTensor | None = None,
                        layer: str = "arr_label") -> None:
     """Logs arrows where each arrow has a numerical label.
@@ -393,7 +393,7 @@ class Mapping3DVisualizer(abc.ABC):
     return proj_feats
 
   def _project_feats_to_rgb(
-      self, feats: torch.FloatTensor) -> torch.FloatTensor:
+      self, feats: torch.Tensor) -> torch.Tensor:
     """Projects features to RGB space for visualization.
 
     Uses the provided feature compressor or PCA to get 3 channels corresponding
@@ -429,7 +429,7 @@ class Mapping3DVisualizer(abc.ABC):
     return self._normalize_projected_feats(feats)
 
   def log_feature_img(self,
-                      feat_img: torch.FloatTensor,
+                      feat_img: torch.Tensor,
                       layer: str = "img_feat",
                       pose_layer: str = "pose") -> None:
     """Logs a feature image.
@@ -444,8 +444,8 @@ class Mapping3DVisualizer(abc.ABC):
                        layer=layer, pose_layer=pose_layer)
 
   def log_feature_pc(self,
-                     pc_xyz: torch.FloatTensor,
-                     pc_feat: torch.FloatTensor,
+                     pc_xyz: torch.Tensor,
+                     pc_feat: torch.Tensor,
                      layer: str = "pc_feat") -> None:
     """Logs a point cloud colorized by arbitrary features.
 
@@ -458,9 +458,9 @@ class Mapping3DVisualizer(abc.ABC):
     self.log_pc(pc_xyz, pc_feat, layer=layer)
 
   def log_feature_arr(self,
-                      arr_origins: torch.FloatTensor,
-                      arr_dirs: torch.FloatTensor,
-                      arr_feats: torch.FloatTensor,
+                      arr_origins: torch.Tensor,
+                      arr_dirs: torch.Tensor,
+                      arr_feats: torch.Tensor,
                       layer: str = "arr_feat") -> None:
     """Logs arrows colorized by arbitrary features.
 
@@ -477,9 +477,9 @@ class Mapping3DVisualizer(abc.ABC):
   ## Special variants
 
   def log_occ_pc(self,
-                 pc_xyz: torch.FloatTensor,
-                 pc_occ: torch.FloatTensor,
-                 pc_radii: torch.FloatTensor | None = None,
+                 pc_xyz: torch.Tensor,
+                 pc_occ: torch.Tensor,
+                 pc_radii: torch.Tensor | None = None,
                  layer: str = "pc_occ"):
     """Log a point cloud / sparse voxel map representing occupancy.
     
@@ -502,7 +502,7 @@ class Mapping3DVisualizer(abc.ABC):
     self.log_pc(pc_xyz, colors, pc_radii, layer)
 
   def log_depth_img(self,
-                    depth_img: torch.FloatTensor,
+                    depth_img: torch.Tensor,
                     layer: str = "img_depth",
                     pose_layer: str = "pose"):
     """Logs depth images.

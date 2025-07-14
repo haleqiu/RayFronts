@@ -84,7 +84,7 @@ class RerunVis(Mapping3DVisualizer):
 
   @override
   def log_pose(self,
-               pose_4x4: torch.FloatTensor,
+               pose_4x4: torch.Tensor,
                layer: str = "pose") -> None:
     rr.log(f"{self._base_name}/{layer}",
            rr.Pinhole(image_from_camera=self.intrinsics_3x3,

@@ -364,10 +364,10 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
 
   @override
   def process_posed_rgbd(self,
-                         rgb_img: torch.FloatTensor,
-                         depth_img: torch.FloatTensor,
-                         pose_4x4: torch.FloatTensor,
-                         conf_map: torch.FloatTensor = None) -> dict:
+                         rgb_img: torch.Tensor,
+                         depth_img: torch.Tensor,
+                         pose_4x4: torch.Tensor,
+                         conf_map: torch.Tensor | None = None) -> dict:
     update_info = dict()
 
     # TODO: Decouple ray resolution from depth resolution. Would be beneficial

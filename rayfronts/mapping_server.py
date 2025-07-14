@@ -66,7 +66,7 @@ class MappingServer:
     else:
       base_point_size = None
 
-    self.vis: visualizers.Mapping3DVisualizer = None
+    self.vis: visualizers.Mapping3DVisualizer | None = None
     if "vis" in cfg and cfg.vis is not None:
       self.vis = hydra.utils.instantiate(cfg.vis, intrinsics_3x3=intrinsics_3x3,
                                          base_point_size=base_point_size)
@@ -77,7 +77,7 @@ class MappingServer:
     init_encoder = init_encoder and "encoder" in cfg
     mapper_kwargs = dict()
 
-    self.encoder: image_encoders.ImageEncoder = None
+    self.encoder: image_encoders.ImageEncoder | None = None
     self.feat_compressor = None
     if self.cfg.mapping.feat_compressor is not None:
       self.feat_compressor = hydra.utils.instantiate(
