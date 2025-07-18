@@ -121,7 +121,7 @@ To run the docker image, an example command is available at the top of each dock
 
 ## Running Image Encoding
 If you are interested in using the encoder on its own for zero-shot open-vocabulary semantic segmentation, follow the example at the top of the [NARADIO](rayfronts/image_encoders/naradio.py) module.
-Or run the provided GRADIO app using:
+Or run the provided GRADIO app by installing gradio `pip install gradio` then running:
 
 ```
 python scripts/encoder_semseg_app.py encoder=naradio encoder.model_version=radio_v2.5-b
