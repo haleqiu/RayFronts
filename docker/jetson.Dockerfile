@@ -82,7 +82,6 @@ WORKDIR /workspace/openvdb/build
 RUN apt-get install -y cmake libboost-iostreams-dev libtbb-dev libblosc-dev     python3-dev python3-numpy python3-pip
 RUN pip3 install nanobind
 RUN cmake -DCMAKE_INSTALL_PREFIX=/usr/local \
--DOPENVDB_BUILD_NANOVDB=ON \
 -DOPENVDB_BUILD_PYTHON_MODULE=ON \
 -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
 -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON \
@@ -91,5 +90,10 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/usr/local \
  
 RUN make -j4
 RUN make install
+
+# Clone rayfronts and compile
+WORKDIR /workspace
+RUN git clone https://github.com/RayFronts/RayFronts.git
+RUN cd RayFronts && CMAKE_INSTALL_PREFIX=/usr/local ./compile.sh
 
 WORKDIR /
