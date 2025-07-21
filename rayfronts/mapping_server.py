@@ -79,7 +79,8 @@ class MappingServer:
 
     self.encoder: image_encoders.ImageEncoder = None
     self.feat_compressor = None
-    if self.cfg.mapping.feat_compressor is not None:
+    if ("feat_compressor" in self.cfg.mapping and
+        self.cfg.mapping.feat_compressor is not None):
       self.feat_compressor = hydra.utils.instantiate(
         self.cfg.mapping.feat_compressor)
 
