@@ -83,12 +83,9 @@ For a full local installation:
     ```
     apt-get install -y libboost-iostreams-dev libtbb-dev libblosc-dev
 
-    git clone https://github.com/OasisArtisan/openvdb && mkdir 
-    
-    openvdb/build && cd openvdb/build
+    git clone https://github.com/OasisArtisan/openvdb && mkdir openvdb/build && cd openvdb/build
 
     cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX \
-    -DOPENVDB_BUILD_NANOVDB=ON \
     -DOPENVDB_BUILD_PYTHON_MODULE=ON \
     -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
     -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON \
