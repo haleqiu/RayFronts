@@ -14,8 +14,8 @@ try:
   from rayfronts.mapping.semantic_ray_frontiers_map import SemanticRayFrontiersMap
 
 except ModuleNotFoundError as e:
-  if e.name == "rayfronts_cpp":
-    logger.warning("Unable to import rayfronts_cpp extension. Make sure you compiled "
-                  "it. Will not import mappers that depend on it.")
+  if e.name == "rayfronts_cpp" or e.name == "openvdb":
+    logger.warning("Unable to import %s. Make sure you compiled "
+                  "it. Will not import mappers that depend on it.", e.name)
   else:
     raise e

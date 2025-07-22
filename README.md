@@ -115,7 +115,7 @@ To run the docker image, an example command is available at the top of each dock
 2. Configure RayFronts. RayFronts has many hyperparameters to choose from. Head over to [configs](rayfronts/configs) to learn more about the different configuration options. For now we will pass in configurations via the command line for simplicity.
 3. There are many mapping systems to choose from from simple occupancy maps and semantic voxel maps to the full fledged Semantic Ray Frontiers (RayFronts). Head over to [mapping](rayfronts/mapping) to learn more about the different options. For now we will assume you want to run the full fledged RayFronts mapper. Run:
     ```
-    python3 -m rayfronts.mapping_server dataset=niceslam_replica dataset.path="path_to_niceslam_replica" mapping=semantic_ray_frontiers_map mapping.vox_size=0.05 dataset.rgb_resolution=[640, 480] dataset.depth_resolution=[640, 480]
+    python3 -m rayfronts.mapping_server dataset=niceslam_replica dataset.path="path_to_niceslam_replica" mapping=semantic_ray_frontiers_map mapping.vox_size=0.05 dataset.rgb_resolution=[640,480] dataset.depth_resolution=[640,480]
     ```
 4. To add and visualize queries, setup a query file (named "prompts.txt" for e.g) and add a query at each line in the text file (You can add paths to images for image querying). Next, add the following command line options when running RayFronts `querying.text_query_mode=prompts querying.query_file=prompts.txt querying.compute_prob=True querying.period=100`. More information can be found about the querying options in the [default.yml](rayfronts/configs/default.yml) config file.
 
