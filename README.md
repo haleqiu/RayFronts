@@ -100,9 +100,9 @@ For a full local installation:
 ### Docker
 Two docker build files are provided. [One for desktop](docker/desktop.Dockerfile), and [one for the NVIDIA Jetson platofrm](docker/jetson.Dockerfile) that give you a full installation of RayFronts with ROS2 and OpenVDB.
 
-You can build the image with:
+You can build the image by going to the docker directory then running:
 
-    docker build docker -f desktop.Dockerfile  -t RayFronts:desktop
+    docker build . -f desktop.Dockerfile  -t rayfronts:desktop
 
 To run the docker image, an example command is available at the top of each docker file.
 

@@ -111,7 +111,7 @@ def on_page_load():
   color_list.clear()
   return gr.update(value="")
 
-@torch.no_grad()
+@torch.inference_mode()
 def process_all(input_image, use_templates, softmax, resolution,
                 model, chunk_size):
   N = len(prompt_list)
@@ -176,7 +176,7 @@ def process_all(input_image, use_templates, softmax, resolution,
 @hydra.main(version_base="1.2",
             config_path="../rayfronts/configs",
             config_name="default")
-@torch.no_grad()
+@torch.inference_mode()
 def main(cfg=None):
   encoder = hydra.utils.instantiate(cfg.encoder)
   step = 16

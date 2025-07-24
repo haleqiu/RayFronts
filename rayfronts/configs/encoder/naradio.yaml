@@ -23,3 +23,9 @@ gauss_std: 7.
 # `align_spatial_features_with_language` to project the radio features to be 
 # language aligned.
 return_radio_features: True
+
+# Whether to compile the model.
+compile: ${compile}
+
+# Whether to use automatic mixed percision when inferring.
+amp: ${amp}

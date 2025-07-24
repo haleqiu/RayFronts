@@ -56,4 +56,10 @@ querying:
   # How often should the mapping server update query results in the map.
   period: 10
 
+# Whether to use torch.compile as much as possible. Improves speed 
+# but may increase VRAM usage.
+compile: True
+# Whether to use automatic mixed percision as much as possible.
+amp: True
+
 seed: 17

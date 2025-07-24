@@ -658,7 +658,7 @@ class SemSegEval:
 @hydra.main(version_base="1.2",
             config_path="../rayfronts/configs",
             config_name="default")
-@torch.no_grad()
+@torch.inference_mode()
 def main(cfg=None):
   semseg_eval = SemSegEval(cfg)
   semseg_eval.run()

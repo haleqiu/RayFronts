@@ -51,7 +51,7 @@ class MappingServer:
     CLOSING = 3 # Server is in the process of shutting down.
     CLOSED = 4 # Server has shutdown.
 
-  @torch.no_grad()
+  @torch.inference_mode()
   def __init__(self, cfg):
     self.status = MappingServer.Status.INIT
     self._status_lock = threading.RLock()
@@ -142,7 +142,7 @@ class MappingServer:
         cfg.messaging_service,
         text_query_callback = self.add_queries if init_encoder else None)
 
-  @torch.no_grad()
+  @torch.inference_mode()
   def add_queries(self, queries: List[str]):
     """Adds a list of queries to query the map with at fixed intervals.
     
@@ -251,7 +251,7 @@ class MappingServer:
           self._queries_feats = None
           self._queries_labels.clear()
 
-  @torch.no_grad()
+  @torch.inference_mode()
   def run(self):
     total_wall_t0 = time.time()
     total_map = 0
@@ -408,7 +408,7 @@ def signal_handler(mapping_server: MappingServer, sig, frame):
     pass # Its fine dataset doesn't have shutdown function
 
 @hydra.main(version_base=None, config_path="configs", config_name="default")
-@torch.no_grad()
+@torch.inference_mode()
 def main(cfg = None):
   if cfg.seed >= 0:
     torch.manual_seed(cfg.seed)

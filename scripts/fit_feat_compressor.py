@@ -94,7 +94,7 @@ class ImageFolderDataset(Dataset):
 @hydra.main(version_base="1.2",
             config_path="../rayfronts/configs",
             config_name="default")
-@torch.no_grad()
+@torch.inference_mode()
 def main(cfg=None):
   logger.info("Initializing..")
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
