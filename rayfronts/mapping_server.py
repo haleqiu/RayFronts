@@ -329,11 +329,11 @@ class MappingServer:
     total_wall_t1 = time.time()
     total_wall = total_wall_t1 - total_wall_t0
     if total_map > 0 and total_wall > 0:
-      logger.info("Total Wall (#%6.4f# ms/batch - #%6.2f# frame/s), "
-                  "Mapping (#%6.4f# ms/batch - #%6.2f# frame/s), "
+      logger.info("Total Wall (#%6.4f# s - #%6.2f# frame/s), "
+                  "Total Mapping (#%6.4f# s - #%6.2f# frame/s), "
                   "Mapping/Wall (#%6.4f%%)", 
-                  total_wall*1e3, total_frames_processed/total_wall,
-                  total_map*1e3, total_frames_processed/total_map,
+                  total_wall, total_frames_processed/total_wall,
+                  total_map, total_frames_processed/total_map,
                   total_map/total_wall*100)
 
     # Shutting down or transitioning to idling

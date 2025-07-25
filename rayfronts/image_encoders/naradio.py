@@ -58,7 +58,7 @@ class GaussKernelAttn(nn.Module):
     self.head_dim = dim // num_heads
     self.scale = self.head_dim ** -0.5
     self.fused_attn = use_fused_attn()
-
+    self.input_resolution = input_resolution
 
     h, w = input_resolution
     n_patches = (w // 16, h //16)
@@ -154,6 +154,16 @@ class GaussKernelAttn(nn.Module):
 
     return attn_output
 
+  def update_input_resolution(self, input_resolution):
+    h, w = input_resolution
+    n_patches = (w // 16, h //16)
+    window_size = [side * 2 - 1 for side in n_patches]
+    window = GaussKernelAttn.gaussian_window(*window_size, std=self.gauss_std,
+                                             device=self.device)
+    self.attn_addition = GaussKernelAttn.get_attention_addition(
+      *n_patches, window, self.num_prefix_tokens
+    ).unsqueeze(0)
+
 class NARadioEncoder(LangSpatialGlobalImageEncoder):
   """The RayFronts Encoder based on NACLIP + RADIO models.
 
@@ -233,7 +243,9 @@ class NARadioEncoder(LangSpatialGlobalImageEncoder):
   def input_resolution(self, value):
     if hasattr(value, "__len__") and len(value) == 2:
       if self.is_compatible_size(*value):
-        self.model.model.blocks[-1].attn.input_resolution=value
+        self.model.model.blocks[-1].attn.update_input_resolution(value)
+        if self.compile:
+          self.model.compile(fullgraph=True, options={"triton.cudagraphs":True})
       else:
         raise ValueError(f"Incompatible input resolution {value}")
     else:

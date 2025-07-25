@@ -49,9 +49,9 @@ color_list = []
 def apply_colormap(image: np.ndarray, cmap_name='viridis') -> np.ndarray:
   """Apply a colormap to a grayscale image and return an RGB uint8 image."""
   # Ensure image is normalized to [0, 1]
-  if image.dtype != np.float32 and image.dtype != np.float64:
+  if image.dtype != np.float16 and image.dtype != np.float32 and image.dtype != np.float64:
       image = image.astype(np.float32) / 255.0
-  image = np.clip(image, 0, 1)  
+  image = np.clip(image, 0, 1)
   cmap = cm.get_cmap(cmap_name)
   colored = cmap(image)[:, :, :3]  # Drop alpha channel
   return (colored * 255).astype(np.uint8)
@@ -117,13 +117,13 @@ def process_all(input_image, use_templates, softmax, resolution,
   N = len(prompt_list)
   resolution = (resolution, resolution)
   if N == 0:
-      raise gr.Error("You must add some prompts", duration=5)
+    raise gr.Error("You must add some prompts", duration=5)
   elif softmax and N == 1:
-      raise gr.Error("With softmax enabled, you need at least two prompts", duration=5)
-  
+    raise gr.Error("With softmax enabled, you need at least two prompts", duration=5)
+
   if hasattr(model, "input_resolution"):
     model.input_resolution = resolution
-  
+
   logger.info("Prompts submitted: %s", str(prompt_list))
   m = "Computing feature map.."
   logger.info(m)
@@ -150,7 +150,7 @@ def process_all(input_image, use_templates, softmax, resolution,
   m = "Computing cosine similarity.."
   logger.info(m)
   yield m
-  H,W,C = feat_map.shape    
+  H,W,C = feat_map.shape
   feat_map = feat_map.reshape(-1, C)
   num_chunks = int(np.ceil(feat_map.shape[0] / chunk_size))
   cos_sim = list()
@@ -167,7 +167,6 @@ def process_all(input_image, use_templates, softmax, resolution,
     cos_sim = utils.norm_img_01(cos_sim.permute(2, 0, 1).unsqueeze(0))
     cos_sim = cos_sim.squeeze(0).permute(1, 2, 0)
 
-
   yield make_grid_output(
     [apply_colormap(x) for x in cos_sim.permute(2, 0, 1).cpu().numpy()],
     prompt_list)
@@ -178,7 +177,12 @@ def process_all(input_image, use_templates, softmax, resolution,
             config_name="default")
 @torch.inference_mode()
 def main(cfg=None):
-  encoder = hydra.utils.instantiate(cfg.encoder)
+  encoder_kwargs = dict()
+  if "NARadioEncoder" in cfg.encoder._target_:
+    encoder_kwargs["input_resolution"] = [224, 224]
+    encoder_kwargs["compile"] = False # Compiling will make resolution changes slow
+
+  encoder = hydra.utils.instantiate(cfg.encoder, **encoder_kwargs)
   step = 16
 
   with gr.Blocks() as demo:
