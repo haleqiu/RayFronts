@@ -764,7 +764,7 @@ class SemanticRayFrontiersMap(SemanticRGBDMapping):
       self.global_vox_rgb_feat_cnt[flag[flag >= 0] == 1]
 
   def update_frontiers(self, active_bbox_min, active_bbox_max) -> None:
-    frontiers_update = rayfronts_cpp.filter_active_bbox_cells_to_array(
+    frontiers_update = rayfronts_cpp.parallel_filter_cells_in_bbox(
       self.occ_map_vdb,
       cell_type_to_iterate = rayfronts_cpp.CellType.Empty,
       world_bbox_min = rayfronts_cpp.Vec3d(*active_bbox_min),

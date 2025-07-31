@@ -12,6 +12,11 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Prune.h>
 
+#include <tbb/tbb.h>
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range.h>
+#include <oneapi/tbb/task_arena.h>
+
 namespace nb = nanobind;
 
 using PointCloudXYZ = nb::ndarray<float, nb::shape<-1, 3>, nb::device::cpu>;
@@ -25,6 +30,9 @@ enum CellType {
     Empty = 2,
     Occupied = 4,
 };
+
+static int num_threads = tbb::info::default_concurrency()/2;
+static oneapi::tbb::task_arena tbb_arena(num_threads);
 
 inline void
 occ_pc2vdb(GridType& grid,
@@ -131,15 +139,16 @@ occ_vdb2sizedpc(GridType& grid) {
 }
 
 inline nb::ndarray<nb::pytorch, float, nb::ndim<2>>
-filter_active_cells_to_array(GridType& grid,
-                             CellType cell_type_to_iterate,
-                             uint16_t neighborhood_r,
-                             uint16_t min_unobserved,
-                             uint16_t max_unobserved,
-                             uint16_t min_empty,
-                             uint16_t max_empty,
-                             uint16_t min_occupied,
-                             uint16_t max_occupied) {
+filter_cells(
+  GridType& grid,
+  CellType cell_type_to_iterate,
+  uint16_t neighborhood_r,
+  uint16_t min_unobserved,
+  uint16_t max_unobserved,
+  uint16_t min_empty,
+  uint16_t max_empty,
+  uint16_t min_occupied,
+  uint16_t max_occupied) {
 
   std::vector<float> result;
   // Current ijk
@@ -214,29 +223,25 @@ filter_active_cells_to_array(GridType& grid,
   );
 }
 
+// Deprecated
 inline nb::ndarray<nb::pytorch, float, nb::ndim<2>>
-filter_active_bbox_cells_to_array(GridType& grid,
-                                  CellType cell_type_to_iterate,
-                                  openvdb::Vec3d world_bbox_min, // length 3
-                                  openvdb::Vec3d world_bbox_max, // length 3
-                                  uint16_t neighborhood_r,
-                                  uint16_t min_unobserved,
-                                  uint16_t max_unobserved,
-                                  uint16_t min_empty,
-                                  uint16_t max_empty,
-                                  uint16_t min_occupied,
-                                  uint16_t max_occupied) {
-
-  // std::cout << world_bbox_min[0] << "," << world_bbox_min[1] << "," << world_bbox_min[2] << std::endl;
-  // std::cout << world_bbox_max[0] << "," << world_bbox_max[1] << "," << world_bbox_max[2] << std::endl;
+filter_cells_in_bbox(
+  GridType& grid,
+  CellType cell_type_to_iterate,
+  openvdb::Vec3d world_bbox_min, 
+  openvdb::Vec3d world_bbox_max,
+  uint16_t neighborhood_r,
+  uint16_t min_unobserved,
+  uint16_t max_unobserved,
+  uint16_t min_empty,
+  uint16_t max_empty,
+  uint16_t min_occupied,
+  uint16_t max_occupied) {
 
   openvdb::Coord bbox_min_ijk =
     openvdb::Coord(openvdb::Vec3i(grid.worldToIndex(world_bbox_min)));
   openvdb::Coord bbox_max_ijk =
     openvdb::Coord(openvdb::Vec3i(grid.worldToIndex(world_bbox_max)));
-
-  // std::cout << bbox_min_ijk[0] << "," << bbox_min_ijk[1] << "," << bbox_min_ijk[2] << std::endl;
-  // std::cout << bbox_max_ijk[0] << "," << bbox_max_ijk[1] << "," << bbox_max_ijk[2] << std::endl;
 
   std::vector<float> result;
   // Current ijk
@@ -313,6 +318,132 @@ filter_active_bbox_cells_to_array(GridType& grid,
   );
 }
 
+inline nb::ndarray<nb::pytorch, float, nb::ndim<2>>
+parallel_filter_cells_in_bbox(
+  GridType& grid,
+  CellType cell_type_to_iterate,
+  openvdb::Vec3d world_bbox_min, // length 3
+  openvdb::Vec3d world_bbox_max, // length 3
+  uint16_t neighborhood_r,
+  uint16_t min_unobserved,
+  uint16_t max_unobserved,
+  uint16_t min_empty,
+  uint16_t max_empty,
+  uint16_t min_occupied,
+  uint16_t max_occupied) {
+
+  openvdb::Coord bbox_min_ijk =
+    openvdb::Coord(openvdb::Vec3i(grid.worldToIndex(world_bbox_min)));
+  openvdb::Coord bbox_max_ijk =
+    openvdb::Coord(openvdb::Vec3i(grid.worldToIndex(world_bbox_max)));
+  
+  // Static to avoid allocating everytime. This means a buffer will persist
+  // and takeup memory even when the function exits prioritizing speed over
+  // memory.
+  static std::unique_ptr<std::vector<float>[]> thread_results = 
+    std::make_unique<std::vector<float>[]>(num_threads);
+
+  for (int t = 0; t < num_threads; t++) {
+    thread_results[t].clear();
+  }
+  
+  tbb_arena.execute([&] {
+    size_t grain_size = 8;
+    auto range = tbb::blocked_range3d<int64_t>(
+      bbox_min_ijk[0], bbox_max_ijk[0]+1, grain_size,
+      bbox_min_ijk[1], bbox_max_ijk[1]+1, grain_size,
+      bbox_min_ijk[2], bbox_max_ijk[2]+1, grain_size);
+
+    tbb::parallel_for(
+      range, [&] (const tbb::blocked_range3d<int64_t>& r) {
+      // Current ijk
+      openvdb::Coord ijk;
+      // Neighboring ijk
+      openvdb::Coord ijk_n;
+
+      auto acc = grid.getConstAccessor();
+
+      int tid = tbb::this_task_arena::current_thread_index();
+
+      for (int64_t i = r.pages().begin(); i != r.pages().end(); ++i) {
+        for (int64_t j = r.rows().begin(); j != r.rows().end(); ++j) {
+          for (int64_t k = r.cols().begin(); k != r.cols().end(); ++k) {
+            ijk = openvdb::Coord(i,j,k);
+            auto occupancy = acc.getValue(ijk);
+
+            // Check if we should iterate over this cell
+            if (occupancy > 0 && ((cell_type_to_iterate & CellType::Occupied) == 0)) {
+              continue;
+            } else if (occupancy < 0 && ((cell_type_to_iterate & CellType::Empty) == 0)) {
+              continue;
+            } else if (occupancy == 0 && ((cell_type_to_iterate & CellType::Unobserved) == 0)) {
+              continue;
+            }
+
+            // Check the neighbors of this cell
+            uint64_t unobserved_cnt = 0;
+            uint64_t empty_cnt = 0;
+            uint64_t occupied_cnt = 0;
+            // TODO: this can be unrolled for neighborhood_r=1 which is the most common
+            for (int x_idx = -neighborhood_r; x_idx <= (int) (neighborhood_r); ++x_idx) {
+              for (int y_idx = -neighborhood_r; y_idx <= (int) (neighborhood_r); ++y_idx) {
+                for (int z_idx = -neighborhood_r; z_idx <= (int) (neighborhood_r); ++z_idx) {
+                  ijk_n[0] = ijk[0] + x_idx;
+                  ijk_n[1] = ijk[1] + y_idx;
+                  ijk_n[2] = ijk[2] + z_idx;
+                  bool active = acc.probeValue(ijk_n, occupancy);
+                  if (!active || occupancy == 0) {
+                    unobserved_cnt++;
+                  } else if (occupancy > 0) {
+                    occupied_cnt++;
+                  } else {
+                    empty_cnt++;
+                  }
+                }
+              }
+            }
+            // TODO: Might be faster to check in the for loops above for quick exit ?
+            if (unobserved_cnt <= max_unobserved && unobserved_cnt >= min_unobserved && 
+                empty_cnt <= max_empty && empty_cnt >= min_empty && 
+                occupied_cnt <= max_occupied && occupied_cnt >= min_occupied) {
+              auto world_coord = grid.indexToWorld(ijk);
+              thread_results[tid].push_back(world_coord.x());
+              thread_results[tid].push_back(world_coord.y());
+              thread_results[tid].push_back(world_coord.z());
+            }
+          }
+        }
+      }
+    });
+  });
+
+  // Copy results from all threads into final buffer
+  // We can also do multi-threaded copy but the size is small enough.
+  size_t total_num_elems = 0;
+  for (int t = 0; t < num_threads; t++) {
+    total_num_elems += thread_results[t].size();
+  }
+  
+  float* combined_results = new float[total_num_elems];
+
+  size_t j = 0;
+  for (int t = 0; t < num_threads; t++) {
+    std::memcpy(combined_results+j, thread_results[t].data(), thread_results[t].size()*sizeof(float));
+    j += thread_results[t].size();
+  }
+
+  // Delete 'data' when the 'owner' capsule expires
+  nb::capsule owner(combined_results, [](void *p) noexcept {
+      delete[] (float *) p;
+  });
+
+  return nb::ndarray<nb::pytorch, float, nb::ndim<2>>(
+      /* data = */ combined_results,
+      /* shape = */ {total_num_elems / 3, 3},
+      /* owner = */ owner
+  );
+}
+
 NB_MODULE(rayfronts_cpp, m) {
     m.def("occ_pc2vdb", &occ_pc2vdb);
     m.def("query_occ", &query_occ);
@@ -322,7 +453,7 @@ NB_MODULE(rayfronts_cpp, m) {
           nb::rv_policy::reference
     );
 
-    m.def("filter_active_cells_to_array", &filter_active_cells_to_array,
+    m.def("filter_cells", &filter_cells,
           nb::arg("grid"),
           nb::arg("cell_type_to_iterate"),
           nb::arg("neighborhood_r") = 1,
@@ -335,9 +466,25 @@ NB_MODULE(rayfronts_cpp, m) {
           nb::rv_policy::reference
     );
 
-    m.def("filter_active_bbox_cells_to_array", 
-          &filter_active_bbox_cells_to_array,
+    m.def("filter_cells_in_bbox", 
+          &filter_cells_in_bbox,
 
+          nb::arg("grid"),
+          nb::arg("cell_type_to_iterate"),
+          nb::arg("world_bbox_min"),
+          nb::arg("world_bbox_max"),
+          nb::arg("neighborhood_r") = 1,
+          nb::arg("min_unobserved") = 0,
+          nb::arg("max_unobserved") = std::numeric_limits<uint16_t>::max(),
+          nb::arg("min_empty") = 0,
+          nb::arg("max_empty") = std::numeric_limits<uint16_t>::max(),
+          nb::arg("min_occupied") = 0,
+          nb::arg("max_occupied") = std::numeric_limits<uint16_t>::max(),
+          nb::rv_policy::reference
+    );
+
+    m.def("parallel_filter_cells_in_bbox", 
+          &parallel_filter_cells_in_bbox,
           nb::arg("grid"),
           nb::arg("cell_type_to_iterate"),
           nb::arg("world_bbox_min"),
